@@ -1,64 +1,59 @@
 import asyncio
+# import json
+# import time
 
 from app.database.sql_db import get_session
-from app.services import project_service
+from app.database.mongo_db import init_mongo
+from app.services import project_service, log_service, cache_service
+
 
 async def main() -> None:
 
+    await init_mongo()
+    
+    
     with get_session() as session:
 
-        # proj_milestone1 = project_service.create_project(session, "Testiprojekti", 3)
 
-        # task_milestone1 = project_service.create_task(session, "Testitehtävä", proj_milestone1.id, "in progress", "2026-04-12")
-
-        # tag_milestone1 = project_service.create_tag(session, "Milestone 1")
-
-        # project_service.add_tag_to_task(session, task_milestone1.id, tag_milestone1.id)
-
-        # print(f"\n--- Projektin '{proj_milestone1.title}' in progress -tehtävät ---")
-        # inprogress_tasks = project_service.get_tasks_by_project_and_status(
-        #     session, proj_milestone1.id, "in progress")
-        # for t in inprogress_tasks:
-        #     print(f" - {t.name}")
-
-        project_service.delete_project(session, 22)
-
-        project_service.delete_task(session, 23)
-
-        project_service.delete_tag(session, 19)
+        brendon = project_service.create_user(
+            session, username="brendon", email="brendon@example.com"
+        )
         
+        project1 = project_service.create_project(
+            session, title="Milestone 2", owner_id=brendon.id
+        )
+        project2 = project_service.create_project(
+            session, title="Demo Project", owner_id=brendon.id
+        )
+    
+        await log_service.create_activity_log(
+            action_type="user_registered",
+            user_id=brendon.id,
+            details={"username": brendon.username, "email": brendon.email}
+        )
+        await log_service.create_activity_log(
+            action_type="project_created",
+            user_id=brendon.id,
+            details={"project_id": project1.id, "project_title": project1.title}
+        )
+        await log_service.create_activity_log(
+            action_type="project_created",
+            user_id=brendon.id,
+            details={"project_id": project2.id, "project_title": project2.title}
+        )
+    
+    print("\n" + "─"*70)
+    print("Cache-Aside Pattern:")
+    print("─"*70)
+    
+    print("\nFirst request (cache miss → MongoDB query)")
+    activity = await cache_service.get_latest_activity_with_fallback()
+    print(f"Result: {activity}")
+    
+    print("\nSecond request (cache hit → no MongoDB query)")
+    activity = await cache_service.get_latest_activity_with_fallback()
+    print(f"Result: {activity}")
 
-        # Aiemmat koodit:
-        
-        # user = project_service.create_user(session, "brendon", "brendon@amk.fi")
-
-        # project_service.delete_user(session, 2)
-
-        # project_service.create_project(session, "Testiprojekti", 3)
-        
-        # t1 = project_service.create_task(session, "Suunnittele kanta", proj.id)
-        # t2 = project_service.create_task(session, "Koodaa mallit", proj.id)
-        # t3 = project_service.create_task(session, "Testaa yhteys", 1)
-        
-        # tag_kiireellinen = project_service.create_tag(session, "Kiireellinen")
-        # tag_backend = project_service.create_tag(session, "Backend")
-
-        # project_service.add_tag_to_task(session, 1, 1)
-        # project_service.add_tag_to_task(session, 2, 5)
-        
-        # full_project = project_service.get_project_with_tasks(session, proj.id)
-        # if full_project:
-        #     print(f"\nProjekti: {full_project.title}")
-        #     print(f"Omistaja: {full_project.owner.username}")
-        #     print(f"Tehtävät:")
-        #     for task in full_project.tasks:
-        #         print(f" - [{task.status}] {task.name}")
-
-        # print("\nTehtävät tagilla 'Kiireellinen'")
-        # urgent_tasks = project_service.get_tasks_by_tag(session, "Kiireellinen")
-        # for t in urgent_tasks:
-        #     print(f"Tehtävä: {t.name} | Projekti: {t.project.title}")
-        #     print(f"Tunnisteet: {[tag.name for tag in t.tags]}")
 
 if __name__ == "__main__":
     asyncio.run(main())
